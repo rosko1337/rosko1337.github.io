@@ -40,13 +40,13 @@
                                 <article class="post-content">
                                     <ul class="posts">
                                         <li>
-                                            <a class="reserved" href="/posts/test1.html">Importing boot2root VM problems</a>
+                                            <a class="reserved" href="/_posts/test1.html">Importing boot2root VM problems</a>
                                         </li>
                                         <li>
-                                            <a class="reserved" href="/posts/test2.html">Some lessons learned doing Phoenix@Exploit.Education</a>
+                                            <a class="reserved" href="/_posts/test2.html">Some lessons learned doing Phoenix@Exploit.Education</a>
                                         </li>
                                         <li>
-                                            <a class="reserved" href="/posts/test3.html">hacking myself, again</a>
+                                            <a class="reserved" href="/_posts/test3.html">hacking myself, again</a>
                                         </li>
                                     </ul>
                                 </article>
@@ -73,7 +73,7 @@
             const repoOwner = 'rosko1337'; // Замени на своё имя пользователя
             const repoName = 'rosko1337.github.io'; // Замени на название своего репозитория
             const branch = 'master'; // Ветка, где находятся файлы
-            const folderPath = 'posts';
+            const folderPath = '_posts';
             const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}?ref=${branch}`;
 
             // Функция для получения списка файлов
@@ -108,7 +108,7 @@
         <script>
             async function loadArticle() {
                 try {
-                    const response = await fetch('posts/posts.md');
+                    const response = await fetch('/_posts/posts.md');
                     if (!response.ok) throw new Error('Ошибка загрузки статьи');
                     const text = await response.text();
                     document.getElementById('content').innerHTML = marked.parse(text);

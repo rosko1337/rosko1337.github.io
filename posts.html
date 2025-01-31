@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>posts | rosko</title>
+        <meta charset="utf-8">
+        <meta name="description" content="I know that what I'm doing looks stupid, but I'm a big boy and really want to do this.">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/style.css">
+        <link rel="shortcut icon" href="/assets/img/favicon.jpg">
+    </head>
+    <body>
+        <div class="container">
+            <header class="row">
+                <div class="col-lg-8 col-lg-offset-2">
+                    <h1 class="">rosko</h1>
+                </div>
+            </header>
+    
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2">
+                    <div class="menu">
+                        <ul>
+                            <li><a href="/">[ home ]</a></li>
+                            <li><a href="/posts">[ posts ]</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <main>
+                <div class="row">
+                    <div class="col-lg-8 col-lg-offset-2">
+                        <main>
+                            <div class="post">
+                                <header class="post-header">
+                                    <h1>Posts | TODO!!!</h1>
+                                </header>
+
+                                <article class="post-content">
+                                    <ul class="posts">
+                                        <li>
+                                            <a class="reserved" href="/posts/test1.html">Importing boot2root VM problems</a>
+                                        </li>
+                                        <li>
+                                            <a class="reserved" href="/posts/test2.html">Some lessons learned doing Phoenix@Exploit.Education</a>
+                                        </li>
+                                        <li>
+                                            <a class="reserved" href="/posts/test3.html">hacking myself, again</a>
+                                        </li>
+                                    </ul>
+                                </article>
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            </main>
+    
+            <div class="row">
+                <div class="col-lg-8 col-lg-offset-2">
+                    <footer>
+                        rosko@rosko1337.github.io/posts:~$ <span class="cursor">_</span>
+                    </footer>
+                </div>
+            </div>
+        </div>
+
+        <h1>Files in posts folder:</h1>
+        <ul id="file-list" class="posts"></ul>
+
+        <script>
+            // URL к GitHub API для получения содержимого папки
+            const repoOwner = 'rosko1337'; // Замени на своё имя пользователя
+            const repoName = 'rosko1337.github.io'; // Замени на название своего репозитория
+            const branch = 'master'; // Ветка, где находятся файлы
+            const folderPath = 'posts';
+            const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${folderPath}?ref=${branch}`;
+
+            // Функция для получения списка файлов
+            async function listFilesInFolder() {
+                try {
+                    const response1 = await fetch(apiUrl);
+                    const response = await fetch('posts');
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    const files = await response.json();
+
+                    const fileListElement = document.getElementById('file-list');
+                    files.forEach(file => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = file.name;
+                        fileListElement.appendChild(listItem);
+                    });
+                } catch (error) {
+                    console.error('There has been a problem with your fetch operation:', error);
+                    document.getElementById('file-list').innerHTML = '<p>Ошибка</p>';
+                }
+            }
+
+            // Запуск функции при загрузке страницы
+            listFilesInFolder();
+        </script>
+
+        <main id="content">
+            <p>Загрузка...</p>
+        </main>
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <script>
+            async function loadArticle() {
+                try {
+                    const response = await fetch('posts/posts.md');
+                    if (!response.ok) throw new Error('Ошибка загрузки статьи');
+                    const text = await response.text();
+                    document.getElementById('content').innerHTML = marked.parse(text);
+                } catch (error) {
+                    document.getElementById('content').innerHTML = '<p>Ошибка загрузки статьи</p>';
+                }
+            }
+            loadArticle();
+        </script>
+    </body>
+</html>

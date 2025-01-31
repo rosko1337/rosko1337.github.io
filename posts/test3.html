@@ -1,0 +1,336 @@
+
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>hacking myself, again | gildasio</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+    <link rel="shortcut icon" href="/assets/img/favicon.jpg">
+
+</head>
+
+
+    <body>
+      <div class="container">
+
+        <header class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+	  <h1 class="">gildasio</h1>
+  </div>
+</header>
+
+<div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <div class="menu">
+      <ul>
+          <li><a href="/">[ home ]</a></li>
+          <li><a href="/posts/">[ posts ]</a></li>
+          <li><a href="/teaching">[ teaching ]</a></li>
+          <li><a href="/poems">[ poems ]</a></li>
+          <!--<li><a href="/press">[ press ]</a></li>-->
+          <li><a href="/feed.xml">[ feed ]</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+
+	<main>
+          <div class="row">
+            <div class="col-lg-8 col-lg-offset-2">
+              <main>
+              <div class="post">
+
+  <header class="post-header">
+    <h1>hacking myself, again</h1>
+  </header>
+
+  <article class="post-content">
+  <div class="post">
+
+  <header class="post-header">
+    <h3>how I broke my luks disk password</h3>
+    <p class="meta">
+        Apr 28, 2023
+         • Gildásio Júnior
+        
+        •
+        <span><a href="" class="reserved">cryptography</a>, </span><span><a href="" class="reserved">hacking</a>, </span><span><a href="" class="reserved">luks</a></span>
+    </p>
+  </header>
+
+  <article class="post-content">
+  <p>Some months ago my laptop falls in the floor and its screen broke. Since than I
+have used just a couple of times. These days I want to power it on to do some
+things but can’t remember the luks password. A fun fact is that these days I was
+talking to my girlfriend and other friend how my memory is really good for now.
+<del>apparently it’s not true</del></p>
+
+<p>Well, I don’t remember the exact password but can remember a little part of it
+as well a pattern that I can use to generate a wordlist. Some years ago I used a
+similar approach to find the password for a old gpg key of mine. I know, I need
+to use better my password manager. In my defense these are pretty old passwords.
+^-^</p>
+
+<p>I borrowed my SATA-USB adapter to a friend so I can not connect the SSD in my
+current machine. So the way to go is to boot up my laptop itself. Luckily I
+always have a prompt ArchLinux ISO in a bootable device.</p>
+
+<p>Once the laptop boots using the ArchLinux ISO I start tmux and split the window
+in two horizontal panes (remember my screen is broken in the middle) so I can
+read it). After it I need to connect to my wifi network so I can download and
+send files:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># iwctl
+station list
+station wlan0 scan
+station wlan0 connect-hidden "my hidden network"
+exit
+</code></pre>
+</div>
+
+<p>Then I install john the ripper so I can use <code class="highlighter-rouge">luks2john</code> to do the job:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># pacman -Sy
+# pacman -S --noconfirm john
+</code></pre>
+</div>
+
+<p>To use john I only need to point the disk and voilà:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ fdisk -l
+$ luks2john /dev/my_luks_volume
+/dev/my_luks_volume: Only cbc-essiv:sha256 mode is supported. Used mode: b'xts-plain64\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+</code></pre>
+</div>
+
+<p>Not so fast :/<br />
+As I can notice john can’t be used against a luks disk that is using aes. Ok,
+fine, let’s try another approach. I just found that hashcat support attacking
+aes luks disks, great!</p>
+
+<p>What I need to do now is extract the luks header to a file so I can send it to
+my computer to hashcat it:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ cryptsetup luksDump /dev/my_luks_volume
+$ dd if=/dev/my_luks_volume of=luks_header.dd bs=512 count=4079
+$ file luks_header.dd
+luks_header.dd: LUKS encrypted file, ver 1 [aes, xts-plain64, sha256] ... slot #1 active ...; slot #2 active
+$ scp luks_header.dd gildasio@my_other_machine:~
+</code></pre>
+</div>
+
+<p>In that machine I need have hashcat and pocl installed.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># pacman -S --noconfirm hashcat pocl
+</code></pre>
+</div>
+
+<p>Now I need to create my wordlist file so I can attack myself. A lot of people
+use <a href="https://sourceforge.net/projects/crunch-wordlist/">crunch</a> for the job. But to attack myself years ago I used <a href="https://github.com/asciimoo/exrex">exrex</a> that works
+amazingly. exrex receive a regex as parameter and generate all possibilities that
+can match this regex. (I like a lot regex such that I play <a href="https://regexcrossword.com/">regexcrossword</a> a lot
+in the past.</p>
+
+<p>Let’s create the wordlist:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ exrex -c 'regex_redacted :)'
+247669456896
+$ exrec 'regex_redacted :)' -o wordlist
+...
+</code></pre>
+</div>
+
+<p>This take a looong time. So I just check:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ls -sh wordlist
+4,0G wordlist
+$ wc -l wordlist
+186537053 wordlist
+</code></pre>
+</div>
+
+<p>haha I can’t wait for this (and I might not have disks enough though. So I try
+to reduce the regex by the price that maybe I can’t find my password:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ exrex -c 'regex_redacted, but a short one :)'
+71663616
+$ exrex 'regex_redacted, but a short one :)' -o wordlist
+$ ls -sh wordlist
+1,6G wordlist
+</code></pre>
+</div>
+
+<p>Ok, that is something I can handle. Still it will be a long run. But ok, I don’t
+have any time constraints for this. So lets run hashcat:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ hashcat -m 14600 -a 0 -w 3 header.luks wordlist -o luks_pass -S
+hashcat (v6.2.6) starting
+
+OpenCL API (OpenCL 3.0 PoCL 3.1  Linux, Release, RELOC, SPIR, LLVM 15.0.6, SLEEF, DISTRO, POCL_DEBUG) - Platform #1 [The pocl project]
+======================================================================================================================================
+* Device #1: ...
+
+Minimum password length supported by kernel: 0
+Maximum password length supported by kernel: 256
+
+Hashfile 'header.luks': Disabled LUKS key detected
+No hashes loaded.
+</code></pre>
+</div>
+
+<p>Wait, what? I did something wrong in extracting the luks header. Searching the
+web just found <a href="https://github.com/paule965/LuksHeader4Hashcat">a project</a> that extract the luks header informing the keyslot. My
+luks disk has some keyslots configured so I don’t need to put the password two
+times while booting the system. So I need to extract the one that is the
+password.</p>
+
+<p>So back to the broken laptop, install git, download the project and run it:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># pacman -S --noconfirm git
+# git clone https://github.com/paule965/LuksHeader4Hashcat
+# python LuksHeader4Hashcat.py /dev/my_luks_volume
+...
+Traceback (most recent call last):
+  File "/home/gildasio/LuksHeader4Hashcat/LuksHeader4Hashcat.py", line 172, in &lt;module&gt;
+    main(sys.argv)
+  File "/home/gildasio/LuksHeader4Hashcat/LuksHeader4Hashcat.py", line 129, in main
+    intKeySlot = raw_input("Which KeySlot should be used? Possible is " + str(PossibleKeyslots) + ": ")
+NameError: name 'raw_input' is not defined
+</code></pre>
+</div>
+
+<p>That’s ok. The LuksHEader4Hashcat was coded to python2 but in Arch we only use
+python3 for now (at least me). Just a patch to replace <code class="highlighter-rouge">raw_input()</code> by
+<code class="highlighter-rouge">input()</code>:</p>
+
+<div class="language-diff highlighter-rouge"><pre class="highlight"><code><span class="gh">diff --git a/LuksHeader4Hashcat.py b/LuksHeader4Hashcat.py
+index bdb5514..33045ba 100644
+</span><span class="gd">--- a/LuksHeader4Hashcat.py
+</span><span class="gi">+++ b/LuksHeader4Hashcat.py
+</span><span class="gu">@@ -126,7 +126,7 @@ def main(args):
+</span> #rebuild the LuksHeader
+        intKeySlot = ""
+        while (not intKeySlot) and (not intKeySlot in PossibleKeyslots):
+<span class="gd">-               intKeySlot = raw_input("Which KeySlot should be used? Possible is " + str(PossibleKeyslots) + ": ")
+</span><span class="gi">+               intKeySlot = input("Which KeySlot should be used? Possible is " + str(PossibleKeyslots) + ": ")
+</span>                if not intKeySlot in str(PossibleKeyslots):
+                        print('Your Input is not a possible KeySlot, exiting Script')
+                        return
+</code></pre>
+</div>
+
+<p>Lets run LuksHeader4hashcat again:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code># python LuksHeader4Hashcat.py /dev/my_luks_volume
+...
+Which KeySlot should be used? Possible is [1, 2]: 2
+
+Your Choice is KeySlot2.
+
+Write to File:         /dev/my_luks_volume_KeySlot2.bin
+# mv /dev/my_luks_volume_KeySlot2.bin ./keyslot2.bin
+# scp keyslot2.bin gildasio@my_other_machine:~
+</code></pre>
+</div>
+
+<p>Time to run hashcat again:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ hashcat -m 14600 -a 0 -w 3 keyslot2.bin wordlist -o luks_pass -S
+...
+</code></pre>
+</div>
+
+<p>After couple of minutes running:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>[s]tatus [p]ause [b]ypass [c]heckpoint [f]inish [q]uit =&gt; s
+
+Session..........: hashcat
+Status...........: Running
+...
+Speed.#1.........:     1611 H/s (39.57ms) @ Accel:256 Loops:499 Thr:1 Vec:8
+...
+Progress.........: 270336/186537054 (0.14%)
+...
+</code></pre>
+</div>
+
+<p>Now it is working but it will take a while. Ok, time to lets hashcat do its job
+so I can go to do something else. But … before getting up from the chair what
+about try the password one last attempt? Ok it will not hurt anyone.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Typing in the broken laptop...
+IT WORKS!!!
+</code></pre>
+</div>
+
+<p>I can’t believe it! Imediatly I take not the password I just tried, reboot the
+laptop and use the password again, yeah, it works!! \o/ <del>apparently it’s true
+that my memory is going good recently haha</del></p>
+
+<p>Ok, mission complete I just <del>found</del> remembered my password. But my curiosity
+now was: Will my approach works?</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ grep 'my_password' wordlist
+my_password
+</code></pre>
+</div>
+
+<p>Yeah! My password was there in the wordlist. But will the hashcat attack works?
+I create another small wordlist with exrex and try the hashcat again:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ exrex -c 'regex_redacted, but a really short one :)'
+96
+$ exrex 'regex_redacted, but a really short one :)' -o wordlist
+$ grep 'my_password' wordlist
+wordlist
+$ hashcat -m 14600 -a 0 -w 3 keyslot2.bin wordlist -o luks_pass -S
+...
+Session..........: hashcat
+Status...........: Cracked
+...
+Progress.........: 96/96 (100.00%)
+...
+$ cat luks_pass
+my_password
+</code></pre>
+</div>
+
+<p>Great! :)<br />
+Hop you like the story.</p>
+
+<blockquote>
+  <p>This post was in draft mode until a friend share a <a href="https://mjg59.dreamwidth.org/66429.html">post about a weakness in luks passwords</a>
+so I think it is time to finish this post as well to share it.</p>
+</blockquote>
+
+  </article>
+</div>
+
+  </article>
+
+</div>
+
+              </main>
+            </div>
+          </div>
+	</main>
+
+        <div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <footer>
+      Thx!
+    </footer>
+  </div>
+</div>
+
+
+      </div>
+    </body>
+</html>

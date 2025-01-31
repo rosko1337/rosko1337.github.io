@@ -1,0 +1,286 @@
+
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Importing boot2root VM problems | gildasio</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+    <link rel="shortcut icon" href="/assets/img/favicon.jpg">
+
+</head>
+
+
+    <body>
+      <div class="container">
+
+        <header class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+	  <h1 class="">gildasio</h1>
+  </div>
+</header>
+
+<div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <div class="menu">
+      <ul>
+          <li><a href="/">[ home ]</a></li>
+          <li><a href="/posts/">[ posts ]</a></li>
+          <li><a href="/teaching">[ teaching ]</a></li>
+          <li><a href="/poems">[ poems ]</a></li>
+          <!--<li><a href="/press">[ press ]</a></li>-->
+          <li><a href="/feed.xml">[ feed ]</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+
+	<main>
+          <div class="row">
+            <div class="col-lg-8 col-lg-offset-2">
+              <main>
+              <div class="post">
+
+  <header class="post-header">
+    <h1>Importing boot2root VM problems</h1>
+  </header>
+
+  <article class="post-content">
+  <div class="post">
+
+  <header class="post-header">
+    <h3></h3>
+    <p class="meta">
+        Oct 25, 2024
+         • Gildásio Júnior
+        
+        •
+        <span><a href="" class="reserved">ctf</a>, </span><span><a href="" class="reserved">pentest</a>, </span><span><a href="" class="reserved">boot2root</a>, </span><span><a href="" class="reserved">virtualization</a></span>
+    </p>
+  </header>
+
+  <article class="post-content">
+  <p>In the last two weeks I took some time to do <a href="https://www.becodoexploit.com/Desafio.html">Beco do Exploit’s challenge</a>. It’s a
+journey to own 30 boot2root machines in a month in order to practice penetration
+testing skills. Now reviewing my notes I’ll post something that caught my
+attention as interesting to do it.</p>
+
+<p>The first one is setting those VMs up. Most of them worked just fine but for
+others I needed to do some hacks. Let’s talk about it.</p>
+
+<h1 class="no_toc" id="table-of-contents">Table of Contents</h1>
+
+<ul id="markdown-toc">
+  <li><a href="#my-vm-setup" id="markdown-toc-my-vm-setup">My VM setup</a></li>
+  <li><a href="#issues-and-fixes" id="markdown-toc-issues-and-fixes">Issues and Fixes</a>    <ul>
+      <li><a href="#change-cmdline-parameters-while-booting" id="markdown-toc-change-cmdline-parameters-while-booting">Change cmdline parameters while booting</a></li>
+      <li><a href="#mounting-qcow2-disk" id="markdown-toc-mounting-qcow2-disk">Mounting QCOW2 disk</a></li>
+      <li><a href="#change-os-type" id="markdown-toc-change-os-type">Change OS type</a></li>
+    </ul>
+  </li>
+  <li><a href="#conclusion" id="markdown-toc-conclusion">Conclusion</a></li>
+</ul>
+
+<h2 id="my-vm-setup">My VM setup</h2>
+
+<p>First things first I will explain how I set my VMs. I use LibVirt + Qemu + KVM
+to set my VMs. Normally virtual machines are shared in VirtualBox or VMware
+format (eg: <code class="highlighter-rouge">.ova</code>), this way I first need to convert its disk to qcow2.</p>
+
+<ul>
+  <li><code class="highlighter-rouge">.ova</code> is just a tar file, so it’s just a matter of extract and convert it
+VMDK disk:</li>
+</ul>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ file 29_pegasus.ova
+29_pegasus.ova: POSIX tar archive (GNU)
+$ tar xvf 29_pegasus.ova
+$ qemu-img convert -p -O qcow2 pegasus-disk1.vmdk 29_pegasus.qcow2
+</code></pre>
+</div>
+
+<ul>
+  <li>I have configured a domain in LibVirt called <code class="highlighter-rouge">test</code>. It is a domain with a
+bridge connection to a virtual network interface, 2G of memory and 2 vCPUs:</li>
+</ul>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ virt-install --network bridge=hd0 \
+  --memory 2048 --vcpus 2 --arch x86_64 \
+  --graphics vnc --noautoconsole \
+  --disk ~/.labs/vms_disks/test.qcow2 \
+  --name test --import --os-variant generic
+</code></pre>
+</div>
+
+<ul>
+  <li>The disk <code class="highlighter-rouge">~/.labs/vms_disks/test.qcow2</code> is a simple symbolic link to a VM I
+want to test in the moment:</li>
+</ul>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ ln -fs $PWD/29_pegasus.qcow2 ~/.labs/vms_disks/test.qcow2
+</code></pre>
+</div>
+
+<h2 id="issues-and-fixes">Issues and Fixes</h2>
+
+<p>While importing these 30 machines I faced two kinds of issues:</p>
+
+<ul>
+  <li>VM boots but networking does not works</li>
+  <li>VM doesn’t even boot</li>
+</ul>
+
+<p>The first problem was the most common. In that case I managed to fix it in two
+different ways: (1) fix ifname and (2) set IP statically. The former is simple
+just setting cmdline on boot, but the former is a nice trick.</p>
+
+<h3 id="change-cmdline-parameters-while-booting">Change cmdline parameters while booting</h3>
+
+<p>There are cases where VM’s devices changes its names while booting. In that case
+the VM network configuration will fail because it uses a different name than the
+actual device name.</p>
+
+<p>Such cases can be easily solved. It is just a matter of edit the kernel command
+line while the VM is booting. To do it, press ‘e’ on GRUB menu and add
+<code class="highlighter-rouge">net.ifnames=0</code> on the line starting by <code class="highlighter-rouge">linux</code>.</p>
+
+<blockquote>
+  <p>Depending on your hardware maybe you need to add <code class="highlighter-rouge">biosdevname=0</code> as well. Read
+this <a href="https://unix.stackexchange.com/questions/637295/linux-kernel-parameters-what-is-the-difference-of-net-ifnames-0-and-biosdevname">link</a> for more information about it.</p>
+</blockquote>
+
+<p><img src="/images/posts/2024/importing-vm-problems/ifnames.png" alt="ifnames cmdline" /></p>
+
+<h3 id="mounting-qcow2-disk">Mounting QCOW2 disk</h3>
+
+<p>I used the previous tip for a while until I faced a VM that it does not made the
+trick so I need to debug. In order to do that I need to have access to the
+machine so I can take a look inside it.</p>
+
+<p>The way I did it was by mounting the QCOW2 image and add a user for myself.
+First open the QCOW2 image as a disk and mount it:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>sudo modprobe nbd max_part=8
+sudo qemu-nbd --connect=/dev/nbd0 $PWD/09_DC.qcow2
+sudo fdisk /dev/nbd0 -l
+sudo mount /dev/nbd0p1 /mnt/
+</code></pre>
+</div>
+
+<p>Then generate a hash from a simple password:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ mkpasswd --method=SHA-512 --stdin
+</code></pre>
+</div>
+
+<p>After it just add an entry on <code class="highlighter-rouge">/mnt/etc/passwd</code>:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ echo 'gildasio:$6$YU2R8SWMFaqNtmEa$Av6bMLtT5krldU9lbyZgG8xjGVZztflSB3CTSSYiI3ed.DCopGhWfUdl/47.cNaJvQ999EYsqZq3HUq57gX9m1:0:0::/:/bin/bash' | sudo tee -a /mnt/etc/passwd
+</code></pre>
+</div>
+
+<p>Now umount it and start the VM:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>sudo umount /mnt/
+sudo qemu-nbd --disconnect /dev/nbd0
+sudo rmmod nbd
+</code></pre>
+</div>
+
+<p>All done, it’s just a matter of understand the problem inside the VM. In all
+cases I just add an IP address statically and back do root the VM.</p>
+
+<blockquote>
+  <p>Try to not get any extra information from the machine to not spoil yourself.
+Keep the challenge interesting :)</p>
+</blockquote>
+
+<h3 id="change-os-type">Change OS type</h3>
+
+<p>There was another case of a virtual machine not starting correctly:</p>
+
+<p><img src="/images/posts/2024/importing-vm-problems/kernel_panic.png" alt="kernel panic" /></p>
+
+<p>I’ve dealt with similar issues in the past so my feeling leads me to believe
+that it is some hardware/module incompatibility. <code class="highlighter-rouge">virt-install</code> provides a
+<code class="highlighter-rouge">--os-variant</code> parameter that can define optimal configurations for a specific
+OS type. Note that my <code class="highlighter-rouge">test</code> domain is defined as <code class="highlighter-rouge">--os-variant generic</code> because
+I use a lot of OS types with it, but in this case it was a problem.</p>
+
+<p>So I check the OS type from this specific machine:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ grep -i ostype covfefe.ovf
+    &lt;OperatingSystemSection ovf:id="95" ovf:version="6" vmw:osType="debian6Guest"&gt;
+</code></pre>
+</div>
+
+<p>It is defined as Debian 6, so I just created another VM also defined as Debian</p>
+<ol>
+  <li>Added <code class="highlighter-rouge">--check path_in_use=off</code> so I can use same
+<code class="highlighter-rouge">~/.labs/vms_disks/test.qcow2</code> as disk without conflicts:</li>
+</ol>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ virt-install --network bridge=hd0 \
+  --memory 2048 --vcpus 2 --arch x86_64 \
+  --graphics vnc --noautoconsole \
+  --disk ~/.labs/vms_disks/test.qcow2 \
+  --name test_debian6 --import \
+  --os-variant debian6 --check path_in_use=off
+</code></pre>
+</div>
+
+<p>The real change within this configuration is Debian 6 uses virtio devices:</p>
+
+<div class="language-diff highlighter-rouge"><pre class="highlight"><code>$ diff -up test.xml test_debian6.xml
+...
+<span class="gu">@@ -30,8 +35,8 @@
+</span>     &lt;disk type='file' device='disk'&gt;
+       &lt;driver name='qemu' type='qcow2'/&gt;
+       &lt;source file='/home/gildasio/.labs/vms_disks/test.qcow2'/&gt;
+<span class="gd">-      &lt;target dev='hda' bus='ide'/&gt;
+-      &lt;address type='drive' controller='0' bus='0' target='0' unit='0'/&gt;
+</span><span class="gi">+      &lt;target dev='vda' bus='virtio'/&gt;
++      &lt;address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/&gt;
+</span>     &lt;/disk&gt;
+     &lt;controller type='usb' index='0' model='ich9-ehci1'&gt;
+       &lt;address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x7'/&gt;
+...
+</code></pre>
+</div>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Using these tips I was able to correctly boot all VMs. Hope this tips can help
+you too in similar circumstances. :)</p>
+
+
+  </article>
+</div>
+
+  </article>
+
+</div>
+
+              </main>
+            </div>
+          </div>
+	</main>
+
+        <div class="row">
+  <div class="col-lg-8 col-lg-offset-2">
+    <footer>
+      Thx!
+    </footer>
+  </div>
+</div>
+
+
+      </div>
+    </body>
+</html>

@@ -38,7 +38,7 @@
                                 </header>
 
                                 <article class="post-content">
-                                    <ul class="posts">
+                                    <ul id="file-list" class="posts">
                                         <li>
                                             <a class="reserved" href="/_posts/test1.html">Importing boot2root VM problems</a>
                                         </li>
@@ -64,9 +64,6 @@
                 </div>
             </div>
         </div>
-
-        <h1>Files in posts folder:</h1>
-        <ul id="file-list" class="posts"></ul>
 
         <script>
             // URL к GitHub API для получения содержимого папки
@@ -99,24 +96,6 @@
 
             // Запуск функции при загрузке страницы
             listFilesInFolder();
-        </script>
-
-        <main id="content">
-            <p>Загрузка...</p>
-        </main>
-        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-        <script>
-            async function loadArticle() {
-                try {
-                    const response = await fetch('/_posts/posts.md');
-                    if (!response.ok) throw new Error('Ошибка загрузки статьи');
-                    const text = await response.text();
-                    document.getElementById('content').innerHTML = marked.parse(text);
-                } catch (error) {
-                    document.getElementById('content').innerHTML = '<p>Ошибка загрузки статьи</p>';
-                }
-            }
-            loadArticle();
         </script>
     </body>
 </html>

@@ -31,7 +31,7 @@ h6 { color: rgba(97, 204, 35,0.3); }
 footer {
     color: #61cc23;
     font-weight: bold;
-    border-top: dashed 1px rgba(255,255,255);
+    border-top: dashed 1px rgba(255,255,255, 0.3);
     margin: 20px auto 15px;
     padding-top: 10px;
 }
@@ -108,8 +108,8 @@ a:visited {
 }
 
 .menu {
-    border-top: 1px dashed rgba(255,255,255);
-    border-bottom: 1px dashed rgba(255,255,255);
+    border-top: 1px dashed rgba(255,255,255, 0.3);
+    border-bottom: 1px dashed rgba(255,255,255, 0.3);
     margin-bottom: 10px;
 }
 .menu ul {
@@ -152,7 +152,7 @@ img {
     display: block;
     margin-left: auto;
     margin-right: auto;
-    border: 1px dashed rgba(255,255,255);
+    border: 1px dashed rgba(255,255,255, 0.3);
     padding: 8px;
     -webkit-border-radius: 3px;
     -moz-border-radius: 3px;
@@ -203,10 +203,10 @@ caption {
     color: rgba(255,255,255,0.3);
 }
 .reserved, main li > a {
-    color: #74ca42;
+    color: #6cb93f;
 }
 .string {
-    color: #74ca42;
+    color: #6cb93f;
 }
 .function {
     color: rgba(255,255,255,0.5);
